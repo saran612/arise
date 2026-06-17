@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const AriseApp());
@@ -16,7 +18,12 @@ class _AriseAppState extends State<AriseApp> {
 
   void _toggleTheme() {
     setState(() {
-      _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+      if (_themeMode == ThemeMode.system) {
+        final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+        _themeMode = brightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark;
+      } else {
+        _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+      }
     });
   }
 
@@ -142,6 +149,33 @@ class Todo {
     required this.createdAt,
     this.dueTime,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'isCompleted': isCompleted,
+      'category': category,
+      'priority': priority,
+      'createdAt': createdAt.toIso8601String(),
+      'dueTime': dueTime != null ? {'hour': dueTime!.hour, 'minute': dueTime!.minute} : null,
+    };
+  }
+
+  factory Todo.fromJson(Map<String, dynamic> json) {
+    final dueTimeJson = json['dueTime'];
+    return Todo(
+      id: json['id'],
+      title: json['title'],
+      isCompleted: json['isCompleted'],
+      category: json['category'],
+      priority: json['priority'],
+      createdAt: DateTime.parse(json['createdAt']),
+      dueTime: dueTimeJson != null
+          ? TimeOfDay(hour: dueTimeJson['hour'], minute: dueTimeJson['minute'])
+          : null,
+    );
+  }
 }
 
 class TodoScreen extends StatefulWidget {
@@ -174,6 +208,30 @@ class _TodoScreenState extends State<TodoScreen> {
   TimeOfDay? _newTodoTime;
 
   @override
+  void initState() {
+    super.initState();
+    _loadTodos();
+  }
+
+  Future<void> _loadTodos() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? todosJson = prefs.getString('todos');
+    if (todosJson != null) {
+      final List<dynamic> decoded = jsonDecode(todosJson);
+      setState(() {
+        _todos.clear();
+        _todos.addAll(decoded.map((item) => Todo.fromJson(item)).toList());
+      });
+    }
+  }
+
+  Future<void> _saveTodos() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String encoded = jsonEncode(_todos.map((todo) => todo.toJson()).toList());
+    await prefs.setString('todos', encoded);
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _todoTitleController.dispose();
@@ -201,12 +259,14 @@ class _TodoScreenState extends State<TodoScreen> {
         _todos[todoIndex].isCompleted = !_todos[todoIndex].isCompleted;
       }
     });
+    _saveTodos();
   }
 
   void _deleteTodo(String id) {
     setState(() {
       _todos.removeWhere((t) => t.id == id);
     });
+    _saveTodos();
   }
 
   void _addTodo() {
@@ -236,6 +296,7 @@ class _TodoScreenState extends State<TodoScreen> {
 
     _todoTitleController.clear();
     _newTodoTime = null;
+    _saveTodos();
     Navigator.of(context).pop();
   }
 
@@ -274,6 +335,7 @@ class _TodoScreenState extends State<TodoScreen> {
           });
           _todoTitleController.clear();
           _newTodoTime = null;
+          _saveTodos();
           Navigator.of(context).pop();
         },
       ),
@@ -600,7 +662,9 @@ class _TodoScreenState extends State<TodoScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final filtered = _filteredTodos;
-    final isDark = widget.currentThemeMode == ThemeMode.dark;
+    final isDark = widget.currentThemeMode == ThemeMode.system
+        ? MediaQuery.platformBrightnessOf(context) == Brightness.dark
+        : widget.currentThemeMode == ThemeMode.dark;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.background,
