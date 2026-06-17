@@ -515,7 +515,7 @@ class _TodoScreenState extends State<TodoScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Image.asset(
-                          'assets/image/arise_logo.png',
+                          'assets/image/1024_black.png',
                           height: 38,
                           errorBuilder: (context, error, stackTrace) {
                             return Text(
