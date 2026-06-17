@@ -12,7 +12,7 @@ class AriseApp extends StatefulWidget {
 }
 
 class _AriseAppState extends State<AriseApp> {
-  ThemeMode _themeMode = ThemeMode.dark; // Default to dark mode
+  ThemeMode _themeMode = ThemeMode.system; // Default to system theme
 
   void _toggleTheme() {
     setState(() {
@@ -56,6 +56,21 @@ class _AriseAppState extends State<AriseApp> {
             side: BorderSide(color: const Color(0xFF0F0F11).withOpacity(0.06), width: 1),
           ),
         ),
+        timePickerTheme: TimePickerThemeData(
+          dayPeriodColor: MaterialStateColor.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return orangeAccent;
+            }
+            return Colors.transparent;
+          }),
+          dayPeriodTextColor: MaterialStateColor.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return Colors.white;
+            }
+            return const Color(0xFF0F0F11);
+          }),
+          dayPeriodBorderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
       ),
       // Dark Theme (90% Black, 30% White, 10% Orange)
       darkTheme: ThemeData(
@@ -85,6 +100,21 @@ class _AriseAppState extends State<AriseApp> {
             side: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
           ),
         ),
+        timePickerTheme: TimePickerThemeData(
+          dayPeriodColor: MaterialStateColor.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return orangeAccent;
+            }
+            return Colors.transparent;
+          }),
+          dayPeriodTextColor: MaterialStateColor.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return Colors.white;
+            }
+            return const Color(0xFFF4F4F6);
+          }),
+          dayPeriodBorderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
       ),
       home: TodoScreen(
         currentThemeMode: _themeMode,
@@ -101,6 +131,7 @@ class Todo {
   String category;
   String priority; // 'High', 'Medium', 'Low'
   final DateTime createdAt;
+  TimeOfDay? dueTime;
 
   Todo({
     required this.id,
@@ -109,6 +140,7 @@ class Todo {
     required this.category,
     required this.priority,
     required this.createdAt,
+    this.dueTime,
   });
 }
 
@@ -127,40 +159,8 @@ class TodoScreen extends StatefulWidget {
 }
 
 class _TodoScreenState extends State<TodoScreen> {
-  final List<Todo> _todos = [
-    Todo(
-      id: '1',
-      title: 'Design Arise brand identity',
-      isCompleted: true,
-      category: 'Design',
-      priority: 'High',
-      createdAt: DateTime.now().subtract(const Duration(hours: 4)),
-    ),
-    Todo(
-      id: '2',
-      title: 'Implement Flutter state management',
-      isCompleted: false,
-      category: 'Work',
-      priority: 'High',
-      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-    ),
-    Todo(
-      id: '3',
-      title: 'Review PRs and backlog',
-      isCompleted: false,
-      category: 'Work',
-      priority: 'Medium',
-      createdAt: DateTime.now().subtract(const Duration(minutes: 30)),
-    ),
-    Todo(
-      id: '4',
-      title: 'Hydrate and stretch for 10 minutes',
-      isCompleted: false,
-      category: 'Fitness',
-      priority: 'Low',
-      createdAt: DateTime.now(),
-    ),
-  ];
+  final List<Todo> _todos = [];
+  DateTime _selectedDate = DateTime.now();
 
   final List<String> _categories = ['All', 'Work', 'Design', 'Fitness', 'Personal'];
   String _selectedCategory = 'All';
@@ -171,6 +171,7 @@ class _TodoScreenState extends State<TodoScreen> {
   final TextEditingController _todoTitleController = TextEditingController();
   String _newTodoCategory = 'Work';
   String _newTodoPriority = 'Medium';
+  TimeOfDay? _newTodoTime;
 
   @override
   void dispose() {
@@ -183,12 +184,15 @@ class _TodoScreenState extends State<TodoScreen> {
     return _todos.where((todo) {
       final matchesCategory = _selectedCategory == 'All' || todo.category == _selectedCategory;
       final matchesSearch = todo.title.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
+      final matchesDate = todo.createdAt.year == _selectedDate.year &&
+          todo.createdAt.month == _selectedDate.month &&
+          todo.createdAt.day == _selectedDate.day;
+      return matchesCategory && matchesSearch && matchesDate;
     }).toList();
   }
 
-  int get _completedCount => _todos.where((t) => t.isCompleted).length;
-  double get _completionRate => _todos.isEmpty ? 0.0 : _completedCount / _todos.length;
+  int get _completedCount => _filteredTodos.where((t) => t.isCompleted).length;
+  double get _completionRate => _filteredTodos.isEmpty ? 0.0 : _completedCount / _filteredTodos.length;
 
   void _toggleTodo(String id) {
     setState(() {
@@ -208,27 +212,46 @@ class _TodoScreenState extends State<TodoScreen> {
   void _addTodo() {
     if (_todoTitleController.text.trim().isEmpty) return;
 
+    final now = DateTime.now();
     setState(() {
       _todos.insert(
         0,
         Todo(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          id: now.millisecondsSinceEpoch.toString(),
           title: _todoTitleController.text.trim(),
           category: _newTodoCategory,
           priority: _newTodoPriority,
-          createdAt: DateTime.now(),
+          createdAt: DateTime(
+            _selectedDate.year,
+            _selectedDate.month,
+            _selectedDate.day,
+            now.hour,
+            now.minute,
+            now.second,
+          ),
+          dueTime: _newTodoTime,
         ),
       );
     });
 
     _todoTitleController.clear();
+    _newTodoTime = null;
     Navigator.of(context).pop();
+  }
+
+  String _formatDate(DateTime date) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   void _editTodo(Todo todo) {
     _todoTitleController.text = todo.title;
     _newTodoCategory = todo.category;
     _newTodoPriority = todo.priority;
+    _newTodoTime = todo.dueTime;
 
     showModalBottomSheet(
       context: context,
@@ -237,14 +260,20 @@ class _TodoScreenState extends State<TodoScreen> {
       builder: (context) => _buildTodoFormBottomSheet(
         title: 'Edit Task',
         submitLabel: 'Save Changes',
+        onDelete: () {
+          _deleteTodo(todo.id);
+          Navigator.of(context).pop();
+        },
         onSubmit: () {
           if (_todoTitleController.text.trim().isEmpty) return;
           setState(() {
             todo.title = _todoTitleController.text.trim();
             todo.category = _newTodoCategory;
             todo.priority = _newTodoPriority;
+            todo.dueTime = _newTodoTime;
           });
           _todoTitleController.clear();
+          _newTodoTime = null;
           Navigator.of(context).pop();
         },
       ),
@@ -255,6 +284,7 @@ class _TodoScreenState extends State<TodoScreen> {
     _todoTitleController.clear();
     _newTodoCategory = 'Work';
     _newTodoPriority = 'Medium';
+    _newTodoTime = null;
 
     showModalBottomSheet(
       context: context,
@@ -337,6 +367,7 @@ class _TodoScreenState extends State<TodoScreen> {
     required String title,
     required String submitLabel,
     required VoidCallback onSubmit,
+    VoidCallback? onDelete,
   }) {
     final theme = Theme.of(context);
     return StatefulBuilder(
@@ -366,9 +397,20 @@ class _TodoScreenState extends State<TodoScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Text(
-                  title,
-                  style: theme.textTheme.headlineMedium,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.headlineMedium,
+                    ),
+                    if (onDelete != null)
+                      IconButton(
+                        onPressed: onDelete,
+                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+                        tooltip: 'Delete Task',
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 TextField(
@@ -468,6 +510,68 @@ class _TodoScreenState extends State<TodoScreen> {
                     );
                   }).toList(),
                 ),
+                const SizedBox(height: 20),
+                Text('Time', style: TextStyle(fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface.withOpacity(0.7))),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime: _newTodoTime ?? TimeOfDay.now(),
+                          );
+                          if (pickedTime != null) {
+                            setModalState(() {
+                              _newTodoTime = pickedTime;
+                            });
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceVariant,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.access_time_rounded,
+                                color: _newTodoTime != null ? theme.colorScheme.primary : theme.colorScheme.onSurface.withOpacity(0.5),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                _newTodoTime != null
+                                    ? _newTodoTime!.format(context)
+                                    : 'Set a due time (optional)',
+                                style: TextStyle(
+                                  color: _newTodoTime != null
+                                      ? theme.colorScheme.onSurface
+                                      : theme.colorScheme.onSurface.withOpacity(0.5),
+                                  fontWeight: _newTodoTime != null ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_newTodoTime != null) ...[
+                      const SizedBox(width: 10),
+                      IconButton(
+                        onPressed: () {
+                          setModalState(() {
+                            _newTodoTime = null;
+                          });
+                        },
+                        icon: const Icon(Icons.clear_rounded),
+                        tooltip: 'Clear time',
+                      ),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 32),
                 ElevatedButton(
                   onPressed: onSubmit,
@@ -515,7 +619,7 @@ class _TodoScreenState extends State<TodoScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Image.asset(
-                          'assets/image/1024_black.png',
+                          'assets/image/arise_logo.png',
                           height: 38,
                           errorBuilder: (context, error, stackTrace) {
                             return Text(
@@ -529,25 +633,71 @@ class _TodoScreenState extends State<TodoScreen> {
                             );
                           },
                         ),
-                        IconButton(
-                          onPressed: widget.onThemeToggle,
-                          icon: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  theme.colorScheme.primary,
-                                  theme.colorScheme.primary.withOpacity(0.7),
-                                ],
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () async {
+                                final pickedDate = await showDatePicker(
+                                  context: context,
+                                  initialDate: _selectedDate,
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2100),
+                                  builder: (context, child) {
+                                    return Theme(
+                                      data: Theme.of(context).copyWith(
+                                        colorScheme: Theme.of(context).colorScheme.copyWith(
+                                          primary: theme.colorScheme.primary,
+                                        ),
+                                      ),
+                                      child: child!,
+                                    );
+                                  },
+                                );
+                                if (pickedDate != null) {
+                                  setState(() {
+                                    _selectedDate = pickedDate;
+                                  });
+                                }
+                              },
+                              icon: Container(
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: theme.colorScheme.onBackground.withOpacity(0.08),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.all(8),
+                                child: Icon(
+                                  Icons.calendar_today_rounded,
+                                  color: theme.colorScheme.primary,
+                                  size: 24,
+                                ),
                               ),
-                              borderRadius: BorderRadius.circular(12),
                             ),
-                            padding: const EdgeInsets.all(8),
-                            child: Icon(
-                              isDark ? Icons.wb_sunny_rounded : Icons.nightlight_round,
-                              color: Colors.white,
-                              size: 24,
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: widget.onThemeToggle,
+                              icon: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      theme.colorScheme.primary,
+                                      theme.colorScheme.primary.withOpacity(0.7),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.all(8),
+                                child: Icon(
+                                  isDark ? Icons.wb_sunny_rounded : Icons.nightlight_round,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
@@ -557,20 +707,17 @@ class _TodoScreenState extends State<TodoScreen> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            theme.colorScheme.primary.withOpacity(0.85),
-                            theme.colorScheme.primary.withOpacity(0.6),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: theme.colorScheme.background,
                         borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: const Color(0xFFF97316), 
+                          width: 1.5,
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: theme.colorScheme.primary.withOpacity(0.3),
-                            blurRadius: 15,
-                            offset: const Offset(0, 10),
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -580,20 +727,21 @@ class _TodoScreenState extends State<TodoScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Your Progress',
+                                Text(
+                                  'Tasks for ${_formatDate(_selectedDate)}',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: theme.colorScheme.onBackground,
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  '$_completedCount of ${_todos.length} tasks completed',
+                                  '$_completedCount of ${_filteredTodos.length} tasks completed',
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
+                                    color: theme.colorScheme.onBackground.withOpacity(0.7),
                                     fontSize: 14,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                                 const SizedBox(height: 16),
@@ -601,8 +749,8 @@ class _TodoScreenState extends State<TodoScreen> {
                                   borderRadius: BorderRadius.circular(4),
                                   child: LinearProgressIndicator(
                                     value: _completionRate,
-                                    backgroundColor: Colors.white.withOpacity(0.2),
-                                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                    backgroundColor: theme.colorScheme.onBackground.withOpacity(0.1),
+                                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                                     minHeight: 6,
                                   ),
                                 ),
@@ -618,15 +766,15 @@ class _TodoScreenState extends State<TodoScreen> {
                                 height: 60,
                                 child: CircularProgressIndicator(
                                   value: _completionRate,
-                                  backgroundColor: Colors.white.withOpacity(0.2),
-                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                  backgroundColor: theme.colorScheme.onBackground.withOpacity(0.1),
+                                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                                   strokeWidth: 6,
                                 ),
                               ),
                               Text(
                                 '${(_completionRate * 100).toInt()}%',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: theme.colorScheme.onBackground,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                 ),
@@ -905,6 +1053,23 @@ class _TodoScreenState extends State<TodoScreen> {
                                                       fontWeight: FontWeight.bold,
                                                     ),
                                                   ),
+                                                  if (todo.dueTime != null) ...[
+                                                    const SizedBox(width: 12),
+                                                    Icon(
+                                                      Icons.access_time_rounded,
+                                                      size: 12,
+                                                      color: theme.colorScheme.onSurface.withOpacity(0.4),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      todo.dueTime!.format(context),
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ],
                                               ),
                                             ],

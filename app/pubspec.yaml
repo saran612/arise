@@ -45,6 +45,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -58,6 +60,8 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/image/arise_logo.png
+    - assets/image/arise_logo_splash.png
     - assets/image/1024_black.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
@@ -85,3 +89,25 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/image/1024_black.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/image/1024_black.png"
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/image/arise_logo_splash.png"
+  color_dark: "#09090B"
+  image_dark: "assets/image/arise_logo_splash.png"
+  android_gravity: center
+  ios_content_mode: center
+  web_image_mode: center
+
+  android_12:
+    image: "assets/image/arise_logo_splash.png"
+    icon_background_color: "#FFFFFF"
+    image_dark: "assets/image/arise_logo_splash.png"
+    icon_background_color_dark: "#09090B"

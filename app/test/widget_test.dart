@@ -10,9 +10,8 @@ void main() {
     // Verify that the title logo image is displayed.
     expect(find.byType(Image), findsOneWidget);
 
-    // Verify that the default tasks are rendered.
-    expect(find.text('Design Arise brand identity'), findsOneWidget);
-    expect(find.text('Implement Flutter state management'), findsOneWidget);
+    // Verify that the app starts with a clean slate.
+    expect(find.text('All clean!'), findsOneWidget);
 
     // Tap the floating action button to open the Add Task modal sheet
     await tester.tap(find.byType(FloatingActionButton));
