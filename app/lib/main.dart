@@ -139,6 +139,8 @@ class Todo {
   String priority; // 'High', 'Medium', 'Low'
   final DateTime createdAt;
   TimeOfDay? dueTime;
+  bool isRepeating;
+  List<String> completedDates;
 
   Todo({
     required this.id,
@@ -148,7 +150,9 @@ class Todo {
     required this.priority,
     required this.createdAt,
     this.dueTime,
-  });
+    this.isRepeating = false,
+    List<String>? completedDates,
+  }) : completedDates = completedDates ?? [];
 
   Map<String, dynamic> toJson() {
     return {
@@ -159,6 +163,8 @@ class Todo {
       'priority': priority,
       'createdAt': createdAt.toIso8601String(),
       'dueTime': dueTime != null ? {'hour': dueTime!.hour, 'minute': dueTime!.minute} : null,
+      'isRepeating': isRepeating,
+      'completedDates': completedDates,
     };
   }
 
@@ -174,6 +180,8 @@ class Todo {
       dueTime: dueTimeJson != null
           ? TimeOfDay(hour: dueTimeJson['hour'], minute: dueTimeJson['minute'])
           : null,
+      isRepeating: json['isRepeating'] ?? false,
+      completedDates: List<String>.from(json['completedDates'] ?? []),
     );
   }
 }
@@ -206,6 +214,7 @@ class _TodoScreenState extends State<TodoScreen> {
   String _newTodoCategory = 'Work';
   String _newTodoPriority = 'Medium';
   TimeOfDay? _newTodoTime;
+  bool _newTodoRepeating = false;
 
   @override
   void initState() {
@@ -242,21 +251,40 @@ class _TodoScreenState extends State<TodoScreen> {
     return _todos.where((todo) {
       final matchesCategory = _selectedCategory == 'All' || todo.category == _selectedCategory;
       final matchesSearch = todo.title.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesDate = todo.createdAt.year == _selectedDate.year &&
+      final matchesDate = (todo.createdAt.year == _selectedDate.year &&
           todo.createdAt.month == _selectedDate.month &&
-          todo.createdAt.day == _selectedDate.day;
+          todo.createdAt.day == _selectedDate.day) || todo.isRepeating;
       return matchesCategory && matchesSearch && matchesDate;
     }).toList();
   }
 
-  int get _completedCount => _filteredTodos.where((t) => t.isCompleted).length;
+  bool _isTodoCompletedOnDate(Todo todo, DateTime date) {
+    if (todo.isRepeating) {
+      final dateKey = "${date.year}-${date.month}-${date.day}";
+      return todo.completedDates.contains(dateKey);
+    } else {
+      return todo.isCompleted;
+    }
+  }
+
+  int get _completedCount => _filteredTodos.where((t) => _isTodoCompletedOnDate(t, _selectedDate)).length;
   double get _completionRate => _filteredTodos.isEmpty ? 0.0 : _completedCount / _filteredTodos.length;
 
   void _toggleTodo(String id) {
     setState(() {
       final todoIndex = _todos.indexWhere((t) => t.id == id);
       if (todoIndex != -1) {
-        _todos[todoIndex].isCompleted = !_todos[todoIndex].isCompleted;
+        final todo = _todos[todoIndex];
+        if (todo.isRepeating) {
+          final dateKey = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
+          if (todo.completedDates.contains(dateKey)) {
+            todo.completedDates.remove(dateKey);
+          } else {
+            todo.completedDates.add(dateKey);
+          }
+        } else {
+          todo.isCompleted = !todo.isCompleted;
+        }
       }
     });
     _saveTodos();
@@ -290,12 +318,14 @@ class _TodoScreenState extends State<TodoScreen> {
             now.second,
           ),
           dueTime: _newTodoTime,
+          isRepeating: _newTodoRepeating,
         ),
       );
     });
 
     _todoTitleController.clear();
     _newTodoTime = null;
+    _newTodoRepeating = false;
     _saveTodos();
     Navigator.of(context).pop();
   }
@@ -313,6 +343,7 @@ class _TodoScreenState extends State<TodoScreen> {
     _newTodoCategory = todo.category;
     _newTodoPriority = todo.priority;
     _newTodoTime = todo.dueTime;
+    _newTodoRepeating = todo.isRepeating;
 
     showModalBottomSheet(
       context: context,
@@ -332,9 +363,11 @@ class _TodoScreenState extends State<TodoScreen> {
             todo.category = _newTodoCategory;
             todo.priority = _newTodoPriority;
             todo.dueTime = _newTodoTime;
+            todo.isRepeating = _newTodoRepeating;
           });
           _todoTitleController.clear();
           _newTodoTime = null;
+          _newTodoRepeating = false;
           _saveTodos();
           Navigator.of(context).pop();
         },
@@ -347,6 +380,7 @@ class _TodoScreenState extends State<TodoScreen> {
     _newTodoCategory = 'Work';
     _newTodoPriority = 'Medium';
     _newTodoTime = null;
+    _newTodoRepeating = false;
 
     showModalBottomSheet(
       context: context,
@@ -444,10 +478,11 @@ class _TodoScreenState extends State<TodoScreen> {
               borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             ),
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 Center(
                   child: Container(
                     width: 40,
@@ -634,6 +669,38 @@ class _TodoScreenState extends State<TodoScreen> {
                     ],
                   ],
                 ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.repeat_rounded,
+                          color: _newTodoRepeating ? theme.colorScheme.primary : theme.colorScheme.onSurface.withOpacity(0.5),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Repeat Daily',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: theme.colorScheme.onSurface.withOpacity(0.8),
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Switch.adaptive(
+                      value: _newTodoRepeating,
+                      activeColor: theme.colorScheme.primary,
+                      onChanged: (val) {
+                        setModalState(() {
+                          _newTodoRepeating = val;
+                        });
+                      },
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 32),
                 ElevatedButton(
                   onPressed: onSubmit,
@@ -653,10 +720,11 @@ class _TodoScreenState extends State<TodoScreen> {
               ],
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -1039,18 +1107,18 @@ class _TodoScreenState extends State<TodoScreen> {
                                           width: 26,
                                           height: 26,
                                           decoration: BoxDecoration(
-                                            color: todo.isCompleted
+                                            color: _isTodoCompletedOnDate(todo, _selectedDate)
                                                 ? theme.colorScheme.tertiary
                                                 : Colors.transparent,
                                             borderRadius: BorderRadius.circular(6),
                                             border: Border.all(
-                                              color: todo.isCompleted
+                                              color: _isTodoCompletedOnDate(todo, _selectedDate)
                                                   ? theme.colorScheme.tertiary
                                                   : theme.colorScheme.onSurface.withOpacity(0.3),
                                               width: 2,
                                             ),
                                           ),
-                                          child: todo.isCompleted
+                                          child: _isTodoCompletedOnDate(todo, _selectedDate)
                                               ? const Icon(
                                                   Icons.check,
                                                   color: Colors.white,
@@ -1070,10 +1138,10 @@ class _TodoScreenState extends State<TodoScreen> {
                                                 style: TextStyle(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w500,
-                                                  color: todo.isCompleted
+                                                  color: _isTodoCompletedOnDate(todo, _selectedDate)
                                                       ? theme.colorScheme.onSurface.withOpacity(0.3)
                                                       : theme.colorScheme.onSurface,
-                                                  decoration: todo.isCompleted
+                                                  decoration: _isTodoCompletedOnDate(todo, _selectedDate)
                                                       ? TextDecoration.lineThrough
                                                       : null,
                                                 ),
@@ -1131,6 +1199,23 @@ class _TodoScreenState extends State<TodoScreen> {
                                                         fontSize: 11,
                                                         color: theme.colorScheme.onSurface.withOpacity(0.5),
                                                         fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                  if (todo.isRepeating) ...[
+                                                    const SizedBox(width: 12),
+                                                    Icon(
+                                                      Icons.repeat_rounded,
+                                                      size: 13,
+                                                      color: theme.colorScheme.primary.withOpacity(0.8),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      'Daily',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: theme.colorScheme.primary.withOpacity(0.8),
+                                                        fontWeight: FontWeight.bold,
                                                       ),
                                                     ),
                                                   ],
