@@ -394,6 +394,95 @@ class _TodoScreenState extends State<TodoScreen> {
     );
   }
 
+  void _showEditCategoryDialog(String category) {
+    if (category == 'All') return;
+
+    final TextEditingController categoryController = TextEditingController(text: category);
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
+        title: Text('Edit Category', style: TextStyle(color: theme.colorScheme.onSurface)),
+        content: TextField(
+          controller: categoryController,
+          autofocus: true,
+          style: TextStyle(color: theme.colorScheme.onSurface),
+          decoration: InputDecoration(
+            hintText: 'Category name',
+            hintStyle: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.4)),
+            filled: true,
+            fillColor: theme.colorScheme.surfaceVariant,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+            ),
+          ),
+        ),
+        actions: [
+          // Delete button
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _categories.remove(category);
+                // Update todos belonging to deleted category to the next available category
+                final defaultCategory = _categories.firstWhere((c) => c != 'All', orElse: () => 'Work');
+                for (var todo in _todos) {
+                  if (todo.category == category) {
+                    todo.category = defaultCategory;
+                  }
+                }
+                if (_selectedCategory == category) {
+                  _selectedCategory = 'All';
+                }
+              });
+              _saveTodos();
+              Navigator.pop(context);
+            },
+            child: const Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newName = categoryController.text.trim();
+              if (newName.isNotEmpty && newName != category) {
+                setState(() {
+                  final index = _categories.indexOf(category);
+                  if (index != -1) {
+                    _categories[index] = newName;
+                  }
+                  // Update all todos under this category
+                  for (var todo in _todos) {
+                    if (todo.category == category) {
+                      todo.category = newName;
+                    }
+                  }
+                  if (_selectedCategory == category) {
+                    _selectedCategory = newName;
+                  }
+                });
+                _saveTodos();
+              }
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Color _getPriorityColor(String priority) {
     switch (priority) {
       case 'High':
@@ -998,6 +1087,9 @@ class _TodoScreenState extends State<TodoScreen> {
                                 setState(() {
                                   _selectedCategory = category;
                                 });
+                              },
+                              onLongPress: category == 'All' ? null : () {
+                                _showEditCategoryDialog(category);
                               },
                               borderRadius: BorderRadius.circular(10),
                               child: Container(
