@@ -624,31 +624,45 @@ class _TodoScreenState extends State<TodoScreen> {
                 const SizedBox(height: 10),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   child: Row(
                     children: _categories.where((c) => c != 'All').map((category) {
                       final isSelected = _newTodoCategory == category;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(category),
-                          selected: isSelected,
-                          selectedColor: theme.colorScheme.primary,
-                          labelStyle: TextStyle(
-                            color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface.withOpacity(0.7),
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                          backgroundColor: theme.colorScheme.surfaceVariant,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: BorderSide.none,
-                          ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              setModalState(() {
-                                _newTodoCategory = category;
-                              });
-                            }
+                        child: InkWell(
+                          onTap: () {
+                            setModalState(() {
+                              _newTodoCategory = category;
+                            });
                           },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? theme.colorScheme.primary.withOpacity(0.15)
+                                  : theme.colorScheme.surfaceVariant,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.onSurface.withOpacity(0.05),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                category,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurface.withOpacity(0.7),
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       );
                     }).toList(),
@@ -697,96 +711,123 @@ class _TodoScreenState extends State<TodoScreen> {
                   }).toList(),
                 ),
                 const SizedBox(height: 20),
-                Text('Time', style: TextStyle(fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface.withOpacity(0.7))),
-                const SizedBox(height: 10),
                 Row(
                   children: [
+                    // Clock Button (Left Side)
                     Expanded(
-                      child: InkWell(
-                        onTap: () async {
-                          final pickedTime = await showTimePicker(
-                            context: context,
-                            initialTime: _newTodoTime ?? TimeOfDay.now(),
-                          );
-                          if (pickedTime != null) {
-                            setModalState(() {
-                              _newTodoTime = pickedTime;
-                            });
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceVariant,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Tooltip(
+                          message: 'Set due time',
+                          child: InkWell(
+                            onTap: () async {
+                              final pickedTime = await showTimePicker(
+                                context: context,
+                                initialTime: _newTodoTime ?? TimeOfDay.now(),
+                              );
+                              if (pickedTime != null) {
+                                setModalState(() {
+                                  _newTodoTime = pickedTime;
+                                });
+                              }
+                            },
                             borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.access_time_rounded,
-                                color: _newTodoTime != null ? theme.colorScheme.primary : theme.colorScheme.onSurface.withOpacity(0.5),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                _newTodoTime != null
-                                    ? _newTodoTime!.format(context)
-                                    : 'Set a due time (optional)',
-                                style: TextStyle(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _newTodoTime != null
+                                    ? theme.colorScheme.primary.withOpacity(0.15)
+                                    : theme.colorScheme.surfaceVariant,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
                                   color: _newTodoTime != null
-                                      ? theme.colorScheme.onSurface
-                                      : theme.colorScheme.onSurface.withOpacity(0.5),
-                                  fontWeight: _newTodoTime != null ? FontWeight.bold : FontWeight.normal,
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurface.withOpacity(0.05),
+                                  width: 1.5,
                                 ),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.access_time_rounded,
+                                    color: _newTodoTime != null
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurface.withOpacity(0.6),
+                                    size: 24,
+                                  ),
+                                  if (_newTodoTime != null) ...[
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _newTodoTime!.format(context),
+                                      style: TextStyle(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    GestureDetector(
+                                      onTap: () {
+                                        setModalState(() {
+                                          _newTodoTime = null;
+                                        });
+                                      },
+                                      child: Icon(
+                                        Icons.clear_rounded,
+                                        color: theme.colorScheme.error,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    if (_newTodoTime != null) ...[
-                      const SizedBox(width: 10),
-                      IconButton(
-                        onPressed: () {
-                          setModalState(() {
-                            _newTodoTime = null;
-                          });
-                        },
-                        icon: const Icon(Icons.clear_rounded),
-                        tooltip: 'Clear time',
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.repeat_rounded,
-                          color: _newTodoRepeating ? theme.colorScheme.primary : theme.colorScheme.onSurface.withOpacity(0.5),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Repeat Daily',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: theme.colorScheme.onSurface.withOpacity(0.8),
-                            fontSize: 15,
+                    // Repeat Button (Right Side)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Tooltip(
+                          message: 'Repeat Daily',
+                          child: InkWell(
+                            onTap: () {
+                              setModalState(() {
+                                _newTodoRepeating = !_newTodoRepeating;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _newTodoRepeating
+                                    ? theme.colorScheme.primary.withOpacity(0.15)
+                                    : theme.colorScheme.surfaceVariant,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _newTodoRepeating
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurface.withOpacity(0.05),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  Icons.repeat_rounded,
+                                  color: _newTodoRepeating
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurface.withOpacity(0.6),
+                                  size: 24,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                    Switch.adaptive(
-                      value: _newTodoRepeating,
-                      activeColor: theme.colorScheme.primary,
-                      onChanged: (val) {
-                        setModalState(() {
-                          _newTodoRepeating = val;
-                        });
-                      },
+                      ),
                     ),
                   ],
                 ),
@@ -1044,7 +1085,7 @@ class _TodoScreenState extends State<TodoScreen> {
 
                     // Category Selector
                     SizedBox(
-                      height: 38,
+                      height: 44,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         physics: const BouncingScrollPhysics(),
