@@ -8,6 +8,45 @@ interface Goal {
 }
 
 function App() {
+  // --- Choice Modal State ---
+  const [showModal, setShowModal] = useState(false);
+
+  const handlePhoneOption = () => {
+    const isAndroidSystem = /Android/i.test(navigator.userAgent);
+    if (isAndroidSystem) {
+      if (window.confirm("We detected you are on Android. Would you like to download the Arise APK now?")) {
+        triggerDownload();
+        setShowModal(false);
+      }
+    } else {
+      if (window.confirm("You are currently not on an Android device. Would you still like to download the Arise APK anyway?")) {
+        triggerDownload();
+        setShowModal(false);
+      }
+    }
+  };
+
+  const handleDesktopOption = () => {
+    alert("The Desktop App is currently under development and will be available soon for macOS, Windows, and Linux! In the meantime, you can use the fully featured Web version.");
+  };
+
+  const handleWebOption = () => {
+    setShowModal(false);
+    const element = document.getElementById('timer');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const triggerDownload = () => {
+    const link = document.createElement('a');
+    link.href = '/Arise.apk';
+    link.download = 'Arise.apk';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // --- Focus Timer State ---
   const [timerMode, setTimerMode] = useState<'focus' | 'shortBreak' | 'longBreak'>('focus');
   const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -112,6 +151,7 @@ function App() {
             <li><a href="#features" className="nav-link">Features</a></li>
             <li><a href="#timer" className="nav-link">Focus App</a></li>
             <li><a href="#goals" className="nav-link">Planner</a></li>
+            <li><a href="/Arise.apk" download className="nav-link" style={{ color: 'var(--accent-color)', fontWeight: 'bold' }}>Download APK</a></li>
           </ul>
         </div>
       </header>
@@ -126,7 +166,7 @@ function App() {
           Arise combines minimalism with highly efficient focus workflows. Schedule goals, run custom pomodoros, and build distraction-free environments right in your browser.
         </p>
         <div className="hero-ctas">
-          <a href="#timer" className="btn btn-primary">Get Started</a>
+          <button onClick={() => setShowModal(true)} className="btn btn-primary">Get Started</button>
           <a href="#features" className="btn btn-secondary">Learn More</a>
         </div>
 
@@ -258,6 +298,33 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+            <h3 className="modal-title">Choose Your Experience</h3>
+            <p className="modal-desc">How would you like to start organizing your focus with Arise?</p>
+            <div className="modal-options">
+              <button className="modal-option-btn web-option" onClick={handleWebOption}>
+                <span className="option-icon">🌐</span>
+                <span className="option-name">Web Version</span>
+                <span className="option-sub">Use directly in your browser</span>
+              </button>
+              <button className="modal-option-btn desktop-option" onClick={handleDesktopOption}>
+                <span className="option-icon">💻</span>
+                <span className="option-name">Desktop App</span>
+                <span className="option-sub">Mac, Windows, and Linux</span>
+              </button>
+              <button className="modal-option-btn phone-option" onClick={handlePhoneOption}>
+                <span className="option-icon">📱</span>
+                <span className="option-name">Phone App</span>
+                <span className="option-sub">Download APK for Android</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
