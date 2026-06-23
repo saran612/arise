@@ -141,6 +141,9 @@ class Todo {
   TimeOfDay? dueTime;
   bool isRepeating;
   List<String> completedDates;
+  bool isCounter;
+  int targetCount;
+  Map<String, int> dateCounts;
 
   Todo({
     required this.id,
@@ -152,7 +155,11 @@ class Todo {
     this.dueTime,
     this.isRepeating = false,
     List<String>? completedDates,
-  }) : completedDates = completedDates ?? [];
+    this.isCounter = false,
+    this.targetCount = 0,
+    Map<String, int>? dateCounts,
+  }) : completedDates = completedDates ?? [],
+       dateCounts = dateCounts ?? {};
 
   Map<String, dynamic> toJson() {
     return {
@@ -165,11 +172,20 @@ class Todo {
       'dueTime': dueTime != null ? {'hour': dueTime!.hour, 'minute': dueTime!.minute} : null,
       'isRepeating': isRepeating,
       'completedDates': completedDates,
+      'isCounter': isCounter,
+      'targetCount': targetCount,
+      'dateCounts': dateCounts,
     };
   }
 
   factory Todo.fromJson(Map<String, dynamic> json) {
     final dueTimeJson = json['dueTime'];
+    final Map<String, int> parsedDateCounts = {};
+    if (json['dateCounts'] != null) {
+      (json['dateCounts'] as Map<String, dynamic>).forEach((key, value) {
+        parsedDateCounts[key] = value as int;
+      });
+    }
     return Todo(
       id: json['id'],
       title: json['title'],
@@ -182,6 +198,9 @@ class Todo {
           : null,
       isRepeating: json['isRepeating'] ?? false,
       completedDates: List<String>.from(json['completedDates'] ?? []),
+      isCounter: json['isCounter'] ?? false,
+      targetCount: json['targetCount'] ?? 0,
+      dateCounts: parsedDateCounts,
     );
   }
 }
@@ -215,6 +234,8 @@ class _TodoScreenState extends State<TodoScreen> {
   String _newTodoPriority = 'Medium';
   TimeOfDay? _newTodoTime;
   bool _newTodoRepeating = false;
+  bool _newTodoIsCounter = false;
+  final TextEditingController _targetCountController = TextEditingController();
 
   @override
   void initState() {
@@ -244,6 +265,7 @@ class _TodoScreenState extends State<TodoScreen> {
   void dispose() {
     _searchController.dispose();
     _todoTitleController.dispose();
+    _targetCountController.dispose();
     super.dispose();
   }
 
@@ -259,8 +281,12 @@ class _TodoScreenState extends State<TodoScreen> {
   }
 
   bool _isTodoCompletedOnDate(Todo todo, DateTime date) {
+    final dateKey = "${date.year}-${date.month}-${date.day}";
+    if (todo.isCounter) {
+      final current = todo.dateCounts[dateKey] ?? 0;
+      return current >= todo.targetCount;
+    }
     if (todo.isRepeating) {
-      final dateKey = "${date.year}-${date.month}-${date.day}";
       return todo.completedDates.contains(dateKey);
     } else {
       return todo.isCompleted;
@@ -275,8 +301,15 @@ class _TodoScreenState extends State<TodoScreen> {
       final todoIndex = _todos.indexWhere((t) => t.id == id);
       if (todoIndex != -1) {
         final todo = _todos[todoIndex];
-        if (todo.isRepeating) {
-          final dateKey = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
+        final dateKey = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
+        if (todo.isCounter) {
+          final current = todo.dateCounts[dateKey] ?? 0;
+          if (current >= todo.targetCount) {
+            todo.dateCounts[dateKey] = 0;
+          } else {
+            todo.dateCounts[dateKey] = todo.targetCount;
+          }
+        } else if (todo.isRepeating) {
           if (todo.completedDates.contains(dateKey)) {
             todo.completedDates.remove(dateKey);
           } else {
@@ -319,6 +352,8 @@ class _TodoScreenState extends State<TodoScreen> {
           ),
           dueTime: _newTodoTime,
           isRepeating: _newTodoRepeating,
+          isCounter: _newTodoIsCounter,
+          targetCount: _newTodoIsCounter ? (int.tryParse(_targetCountController.text) ?? 1) : 0,
         ),
       );
     });
@@ -326,6 +361,8 @@ class _TodoScreenState extends State<TodoScreen> {
     _todoTitleController.clear();
     _newTodoTime = null;
     _newTodoRepeating = false;
+    _newTodoIsCounter = false;
+    _targetCountController.clear();
     _saveTodos();
     Navigator.of(context).pop();
   }
@@ -344,6 +381,8 @@ class _TodoScreenState extends State<TodoScreen> {
     _newTodoPriority = todo.priority;
     _newTodoTime = todo.dueTime;
     _newTodoRepeating = todo.isRepeating;
+    _newTodoIsCounter = todo.isCounter;
+    _targetCountController.text = todo.targetCount > 0 ? todo.targetCount.toString() : '';
 
     showModalBottomSheet(
       context: context,
@@ -364,10 +403,14 @@ class _TodoScreenState extends State<TodoScreen> {
             todo.priority = _newTodoPriority;
             todo.dueTime = _newTodoTime;
             todo.isRepeating = _newTodoRepeating;
+            todo.isCounter = _newTodoIsCounter;
+            todo.targetCount = _newTodoIsCounter ? (int.tryParse(_targetCountController.text) ?? 1) : 0;
           });
           _todoTitleController.clear();
           _newTodoTime = null;
           _newTodoRepeating = false;
+          _newTodoIsCounter = false;
+          _targetCountController.clear();
           _saveTodos();
           Navigator.of(context).pop();
         },
@@ -381,6 +424,8 @@ class _TodoScreenState extends State<TodoScreen> {
     _newTodoPriority = 'Medium';
     _newTodoTime = null;
     _newTodoRepeating = false;
+    _newTodoIsCounter = false;
+    _targetCountController.clear();
 
     showModalBottomSheet(
       context: context,
@@ -713,7 +758,7 @@ class _TodoScreenState extends State<TodoScreen> {
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    // Clock Button (Left Side)
+                    // Clock/Timer Button
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -755,18 +800,20 @@ class _TodoScreenState extends State<TodoScreen> {
                                     color: _newTodoTime != null
                                         ? theme.colorScheme.primary
                                         : theme.colorScheme.onSurface.withOpacity(0.6),
-                                    size: 24,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _newTodoTime != null ? _newTodoTime!.format(context) : 'Time',
+                                    style: TextStyle(
+                                      color: _newTodoTime != null
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.onSurface.withOpacity(0.7),
+                                      fontWeight: _newTodoTime != null ? FontWeight.bold : FontWeight.normal,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                   if (_newTodoTime != null) ...[
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      _newTodoTime!.format(context),
-                                      style: TextStyle(
-                                        color: theme.colorScheme.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                      ),
-                                    ),
                                     const SizedBox(width: 4),
                                     GestureDetector(
                                       onTap: () {
@@ -777,7 +824,7 @@ class _TodoScreenState extends State<TodoScreen> {
                                       child: Icon(
                                         Icons.clear_rounded,
                                         color: theme.colorScheme.error,
-                                        size: 18,
+                                        size: 14,
                                       ),
                                     ),
                                   ],
@@ -788,7 +835,7 @@ class _TodoScreenState extends State<TodoScreen> {
                         ),
                       ),
                     ),
-                    // Repeat Button (Right Side)
+                    // Repeat Button
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -815,14 +862,83 @@ class _TodoScreenState extends State<TodoScreen> {
                                   width: 1.5,
                                 ),
                               ),
-                              child: Center(
-                                child: Icon(
-                                  Icons.repeat_rounded,
-                                  color: _newTodoRepeating
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.repeat_rounded,
+                                    color: _newTodoRepeating
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurface.withOpacity(0.6),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Repeat',
+                                    style: TextStyle(
+                                      color: _newTodoRepeating
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.onSurface.withOpacity(0.7),
+                                      fontWeight: _newTodoRepeating ? FontWeight.bold : FontWeight.normal,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Counter Button
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Tooltip(
+                          message: 'Toggle Counter Task',
+                          child: InkWell(
+                            onTap: () {
+                              setModalState(() {
+                                _newTodoIsCounter = !_newTodoIsCounter;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _newTodoIsCounter
+                                    ? theme.colorScheme.primary.withOpacity(0.15)
+                                    : theme.colorScheme.surfaceVariant,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _newTodoIsCounter
                                       ? theme.colorScheme.primary
-                                      : theme.colorScheme.onSurface.withOpacity(0.6),
-                                  size: 24,
+                                      : theme.colorScheme.onSurface.withOpacity(0.05),
+                                  width: 1.5,
                                 ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.plus_one_rounded,
+                                    color: _newTodoIsCounter
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurface.withOpacity(0.6),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Counter',
+                                    style: TextStyle(
+                                      color: _newTodoIsCounter
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.onSurface.withOpacity(0.7),
+                                      fontWeight: _newTodoIsCounter ? FontWeight.bold : FontWeight.normal,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -831,6 +947,35 @@ class _TodoScreenState extends State<TodoScreen> {
                     ),
                   ],
                 ),
+                if (_newTodoIsCounter) ...[
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: SizedBox(
+                      height: 48,
+                      child: TextField(
+                        controller: _targetCountController,
+                        keyboardType: TextInputType.number,
+                        style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Target (e.g. 100)',
+                          hintStyle: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceVariant,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 ElevatedButton(
                   onPressed: onSubmit,
@@ -1228,38 +1373,40 @@ class _TodoScreenState extends State<TodoScreen> {
                                 margin: EdgeInsets.zero,
                                 child: InkWell(
                                   onTap: () => _toggleTodo(todo.id),
-                                  onDoubleTap: () => _editTodo(todo),
+                                  onLongPress: () => _editTodo(todo),
                                   borderRadius: BorderRadius.circular(16),
                                   child: Padding(
                                     padding: const EdgeInsets.all(16),
                                     child: Row(
                                       children: [
                                         // Animated Custom Checkbox
-                                        AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
-                                          width: 26,
-                                          height: 26,
-                                          decoration: BoxDecoration(
-                                            color: _isTodoCompletedOnDate(todo, _selectedDate)
-                                                ? theme.colorScheme.tertiary
-                                                : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(
+                                        if (!todo.isCounter || _isTodoCompletedOnDate(todo, _selectedDate)) ...[
+                                          AnimatedContainer(
+                                            duration: const Duration(milliseconds: 200),
+                                            width: 26,
+                                            height: 26,
+                                            decoration: BoxDecoration(
                                               color: _isTodoCompletedOnDate(todo, _selectedDate)
                                                   ? theme.colorScheme.tertiary
-                                                  : theme.colorScheme.onSurface.withOpacity(0.3),
-                                              width: 2,
+                                                  : Colors.transparent,
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(
+                                                color: _isTodoCompletedOnDate(todo, _selectedDate)
+                                                    ? theme.colorScheme.tertiary
+                                                    : theme.colorScheme.onSurface.withOpacity(0.3),
+                                                width: 2,
+                                              ),
                                             ),
+                                            child: _isTodoCompletedOnDate(todo, _selectedDate)
+                                                ? const Icon(
+                                                    Icons.check,
+                                                    color: Colors.white,
+                                                    size: 16,
+                                                  )
+                                                : null,
                                           ),
-                                          child: _isTodoCompletedOnDate(todo, _selectedDate)
-                                              ? const Icon(
-                                                  Icons.check,
-                                                  color: Colors.white,
-                                                  size: 16,
-                                                )
-                                              : null,
-                                        ),
-                                        const SizedBox(width: 16),
+                                          const SizedBox(width: 16),
+                                        ],
 
                                         // Todo details
                                         Expanded(
@@ -1358,15 +1505,125 @@ class _TodoScreenState extends State<TodoScreen> {
                                           ),
                                         ),
 
-                                        // Action buttons (edit/delete)
-                                        IconButton(
-                                          icon: Icon(
-                                            Icons.edit_outlined,
-                                            color: theme.colorScheme.onSurface.withOpacity(0.5),
-                                            size: 20,
+                                        // Action buttons
+                                        if (todo.isCounter) ...[
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              InkWell(
+                                                onTap: () {
+                                                  setState(() {
+                                                    final dateKey = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
+                                                    final current = todo.dateCounts[dateKey] ?? 0;
+                                                    if (current > 0) {
+                                                      todo.dateCounts[dateKey] = current - 1;
+                                                    }
+                                                  });
+                                                  _saveTodos();
+                                                },
+                                                borderRadius: BorderRadius.circular(6),
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(5),
+                                                  decoration: BoxDecoration(
+                                                    color: theme.colorScheme.surfaceVariant,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(
+                                                      color: theme.colorScheme.onSurface.withOpacity(0.12),
+                                                      width: 1.2,
+                                                    ),
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.remove,
+                                                    color: theme.colorScheme.onSurface.withOpacity(0.8),
+                                                    size: 16,
+                                                  ),
+                                                ),
+                                              ),
+                                              InkWell(
+                                                onTap: () {
+                                                  final controller = TextEditingController(
+                                                    text: (todo.dateCounts["${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}"] ?? 0).toString()
+                                                  );
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (context) => AlertDialog(
+                                                      backgroundColor: theme.colorScheme.surface,
+                                                      title: const Text('Set Progress'),
+                                                      content: TextField(
+                                                        controller: controller,
+                                                        keyboardType: TextInputType.number,
+                                                        autofocus: true,
+                                                        decoration: const InputDecoration(
+                                                          hintText: 'Enter count',
+                                                        ),
+                                                      ),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () => Navigator.pop(context),
+                                                          child: const Text('Cancel'),
+                                                        ),
+                                                        ElevatedButton(
+                                                          onPressed: () {
+                                                            final val = int.tryParse(controller.text);
+                                                            if (val != null && val >= 0) {
+                                                              setState(() {
+                                                                final dateKey = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
+                                                                todo.dateCounts[dateKey] = val;
+                                                              });
+                                                              _saveTodos();
+                                                            }
+                                                            Navigator.pop(context);
+                                                          },
+                                                          child: const Text('Set'),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                },
+                                                child: Padding(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                  child: Text(
+                                                    "${todo.dateCounts["${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}"] ?? 0}/${todo.targetCount}",
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      color: _isTodoCompletedOnDate(todo, _selectedDate)
+                                                          ? theme.colorScheme.tertiary
+                                                          : theme.colorScheme.onSurface,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              InkWell(
+                                                onTap: () {
+                                                  setState(() {
+                                                    final dateKey = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
+                                                    final current = todo.dateCounts[dateKey] ?? 0;
+                                                    todo.dateCounts[dateKey] = current + 1;
+                                                  });
+                                                  _saveTodos();
+                                                },
+                                                borderRadius: BorderRadius.circular(6),
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(5),
+                                                  decoration: BoxDecoration(
+                                                    color: theme.colorScheme.primary.withOpacity(0.1),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(
+                                                      color: theme.colorScheme.primary.withOpacity(0.3),
+                                                      width: 1.2,
+                                                    ),
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.add,
+                                                    color: theme.colorScheme.primary,
+                                                    size: 16,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          onPressed: () => _editTodo(todo),
-                                        ),
+                                        ],
                                       ],
                                     ),
                                   ),
