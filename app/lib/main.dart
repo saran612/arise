@@ -1427,7 +1427,10 @@ class _TodoScreenState extends State<TodoScreen> {
                                                 ),
                                               ),
                                               const SizedBox(height: 8),
-                                              Row(
+                                              Wrap(
+                                                spacing: 8,
+                                                runSpacing: 4,
+                                                crossAxisAlignment: WrapCrossAlignment.center,
                                                 children: [
                                                   // Category label
                                                   Container(
@@ -1445,60 +1448,72 @@ class _TodoScreenState extends State<TodoScreen> {
                                                       ),
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 8),
 
-                                                  // Priority dot
-                                                  Container(
-                                                    width: 8,
-                                                    height: 8,
-                                                    decoration: BoxDecoration(
-                                                      color: priorityColor,
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    todo.priority,
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: priorityColor,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  if (todo.dueTime != null) ...[
-                                                    const SizedBox(width: 12),
-                                                    Icon(
-                                                      Icons.access_time_rounded,
-                                                      size: 12,
-                                                      color: theme.colorScheme.onSurface.withOpacity(0.4),
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      todo.dueTime!.format(context),
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: theme.colorScheme.onSurface.withOpacity(0.5),
-                                                        fontWeight: FontWeight.w500,
+                                                  // Priority dot & text
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Container(
+                                                        width: 8,
+                                                        height: 8,
+                                                        decoration: BoxDecoration(
+                                                          color: priorityColor,
+                                                          shape: BoxShape.circle,
+                                                        ),
                                                       ),
-                                                    ),
-                                                  ],
-                                                  if (todo.isRepeating) ...[
-                                                    const SizedBox(width: 12),
-                                                    Icon(
-                                                      Icons.repeat_rounded,
-                                                      size: 13,
-                                                      color: theme.colorScheme.primary.withOpacity(0.8),
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      'Daily',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: theme.colorScheme.primary.withOpacity(0.8),
-                                                        fontWeight: FontWeight.bold,
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        todo.priority,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          color: priorityColor,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
                                                       ),
+                                                    ],
+                                                  ),
+
+                                                  if (todo.dueTime != null)
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.access_time_rounded,
+                                                          size: 12,
+                                                          color: theme.colorScheme.onSurface.withOpacity(0.4),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          todo.dueTime!.format(context),
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                                            fontWeight: FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
-                                                  ],
+
+                                                  if (todo.isRepeating)
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.repeat_rounded,
+                                                          size: 13,
+                                                          color: theme.colorScheme.primary.withOpacity(0.8),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          'Daily',
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            color: theme.colorScheme.primary.withOpacity(0.8),
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                 ],
                                               ),
                                             ],
