@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dashboard_screen.dart';
 
 void main() {
   runApp(const AriseApp());
@@ -1025,20 +1026,33 @@ class _TodoScreenState extends State<TodoScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Image.asset(
-                          'assets/image/arise_logo.png',
-                          height: 38,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Text(
-                              'Arise',
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: -1,
-                                color: theme.colorScheme.onBackground,
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => UserDashboardScreen(todos: _todos),
                               ),
                             );
                           },
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: Image.asset(
+                              'assets/image/arise_logo.png',
+                              height: 38,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Text(
+                                  'Arise',
+                                  style: TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: -1,
+                                    color: theme.colorScheme.onBackground,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ),
                         Row(
                           children: [
