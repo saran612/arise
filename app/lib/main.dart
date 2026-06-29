@@ -141,6 +141,7 @@ class Todo {
   final DateTime createdAt;
   TimeOfDay? dueTime;
   bool isRepeating;
+  List<int> repeatDays; // Days of week: 1 = Mon, 7 = Sun
   List<String> completedDates;
   bool isCounter;
   int targetCount;
@@ -155,11 +156,13 @@ class Todo {
     required this.createdAt,
     this.dueTime,
     this.isRepeating = false,
+    List<int>? repeatDays,
     List<String>? completedDates,
     this.isCounter = false,
     this.targetCount = 0,
     Map<String, int>? dateCounts,
-  }) : completedDates = completedDates ?? [],
+  }) : repeatDays = repeatDays ?? [1, 2, 3, 4, 5, 6, 7],
+       completedDates = completedDates ?? [],
        dateCounts = dateCounts ?? {};
 
   Map<String, dynamic> toJson() {
@@ -172,6 +175,7 @@ class Todo {
       'createdAt': createdAt.toIso8601String(),
       'dueTime': dueTime != null ? {'hour': dueTime!.hour, 'minute': dueTime!.minute} : null,
       'isRepeating': isRepeating,
+      'repeatDays': repeatDays,
       'completedDates': completedDates,
       'isCounter': isCounter,
       'targetCount': targetCount,
@@ -198,6 +202,7 @@ class Todo {
           ? TimeOfDay(hour: dueTimeJson['hour'], minute: dueTimeJson['minute'])
           : null,
       isRepeating: json['isRepeating'] ?? false,
+      repeatDays: List<int>.from(json['repeatDays'] ?? [1, 2, 3, 4, 5, 6, 7]),
       completedDates: List<String>.from(json['completedDates'] ?? []),
       isCounter: json['isCounter'] ?? false,
       targetCount: json['targetCount'] ?? 0,
@@ -228,6 +233,9 @@ class _TodoScreenState extends State<TodoScreen> {
   String _selectedCategory = 'All';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+
+  bool _hideCompleted = false;
+  List<int> _newTodoRepeatDays = [1, 2, 3, 4, 5, 6, 7];
 
   // Dialog/modal inputs
   final TextEditingController _todoTitleController = TextEditingController();
@@ -274,9 +282,22 @@ class _TodoScreenState extends State<TodoScreen> {
     return _todos.where((todo) {
       final matchesCategory = _selectedCategory == 'All' || todo.category == _selectedCategory;
       final matchesSearch = todo.title.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesDate = (todo.createdAt.year == _selectedDate.year &&
+      
+      final isSameDay = todo.createdAt.year == _selectedDate.year &&
           todo.createdAt.month == _selectedDate.month &&
-          todo.createdAt.day == _selectedDate.day) || todo.isRepeating;
+          todo.createdAt.day == _selectedDate.day;
+      final isPastDay = todo.createdAt.isBefore(_selectedDate);
+      final isHighPriorityIncompletePast = todo.priority == 'High' &&
+          !_isTodoCompletedOnDate(todo, _selectedDate) &&
+          !todo.isRepeating &&
+          isPastDay;
+
+      final isRepeatingDay = todo.isRepeating && todo.repeatDays.contains(_selectedDate.weekday);
+      final matchesDate = isSameDay || isRepeatingDay || isHighPriorityIncompletePast;
+
+      if (_hideCompleted && _isTodoCompletedOnDate(todo, _selectedDate)) {
+        return false;
+      }
       return matchesCategory && matchesSearch && matchesDate;
     }).toList();
   }
@@ -353,6 +374,7 @@ class _TodoScreenState extends State<TodoScreen> {
           ),
           dueTime: _newTodoTime,
           isRepeating: _newTodoRepeating,
+          repeatDays: List<int>.from(_newTodoRepeatDays),
           isCounter: _newTodoIsCounter,
           targetCount: _newTodoIsCounter ? (int.tryParse(_targetCountController.text) ?? 1) : 0,
         ),
@@ -362,6 +384,7 @@ class _TodoScreenState extends State<TodoScreen> {
     _todoTitleController.clear();
     _newTodoTime = null;
     _newTodoRepeating = false;
+    _newTodoRepeatDays = [1, 2, 3, 4, 5, 6, 7];
     _newTodoIsCounter = false;
     _targetCountController.clear();
     _saveTodos();
@@ -382,6 +405,7 @@ class _TodoScreenState extends State<TodoScreen> {
     _newTodoPriority = todo.priority;
     _newTodoTime = todo.dueTime;
     _newTodoRepeating = todo.isRepeating;
+    _newTodoRepeatDays = List<int>.from(todo.repeatDays);
     _newTodoIsCounter = todo.isCounter;
     _targetCountController.text = todo.targetCount > 0 ? todo.targetCount.toString() : '';
 
@@ -404,12 +428,14 @@ class _TodoScreenState extends State<TodoScreen> {
             todo.priority = _newTodoPriority;
             todo.dueTime = _newTodoTime;
             todo.isRepeating = _newTodoRepeating;
+            todo.repeatDays = List<int>.from(_newTodoRepeatDays);
             todo.isCounter = _newTodoIsCounter;
             todo.targetCount = _newTodoIsCounter ? (int.tryParse(_targetCountController.text) ?? 1) : 0;
           });
           _todoTitleController.clear();
           _newTodoTime = null;
           _newTodoRepeating = false;
+          _newTodoRepeatDays = [1, 2, 3, 4, 5, 6, 7];
           _newTodoIsCounter = false;
           _targetCountController.clear();
           _saveTodos();
@@ -425,6 +451,7 @@ class _TodoScreenState extends State<TodoScreen> {
     _newTodoPriority = 'Medium';
     _newTodoTime = null;
     _newTodoRepeating = false;
+    _newTodoRepeatDays = [1, 2, 3, 4, 5, 6, 7];
     _newTodoIsCounter = false;
     _targetCountController.clear();
 
@@ -438,6 +465,92 @@ class _TodoScreenState extends State<TodoScreen> {
         onSubmit: _addTodo,
       ),
     );
+  }
+
+  void _showRepeatDaysSelector(BuildContext context, StateSetter setModalState, List<int> currentDays, ValueChanged<List<int>> onSave) {
+    final dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final List<int> tempDays = List<int>.from(currentDays);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: theme.colorScheme.background,
+              title: const Text('Select Repeat Days'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(7, (index) {
+                  final dayInt = index + 1;
+                  final isChecked = tempDays.contains(dayInt);
+                  return CheckboxListTile(
+                    title: Text(dayNames[index]),
+                    value: isChecked,
+                    activeColor: theme.colorScheme.primary,
+                    onChanged: (bool? val) {
+                      setDialogState(() {
+                        if (val == true) {
+                          if (!tempDays.contains(dayInt)) tempDays.add(dayInt);
+                        } else {
+                          if (tempDays.length > 1) {
+                            tempDays.remove(dayInt);
+                          }
+                        }
+                      });
+                    },
+                  );
+                }),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    onSave(tempDays);
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _getRepeatDaysText(List<int> days) {
+    if (days.length == 7) return 'Daily';
+
+    final isWeekdays = days.length == 5 &&
+        days.contains(1) &&
+        days.contains(2) &&
+        days.contains(3) &&
+        days.contains(4) &&
+        days.contains(5);
+    if (isWeekdays) return 'Weekdays';
+
+    final isWeekends = days.length == 2 &&
+        days.contains(6) &&
+        days.contains(7);
+    if (isWeekends) return 'Weekends';
+
+    final dayAbbreviations = {
+      1: 'Mon',
+      2: 'Tue',
+      3: 'Wed',
+      4: 'Thu',
+      5: 'Fri',
+      6: 'Sat',
+      7: 'Sun',
+    };
+
+    final sortedDays = List<int>.from(days)..sort();
+    return sortedDays.map((d) => dayAbbreviations[d]).join(', ');
   }
 
   void _showEditCategoryDialog(String category) {
@@ -848,6 +961,19 @@ class _TodoScreenState extends State<TodoScreen> {
                                 _newTodoRepeating = !_newTodoRepeating;
                               });
                             },
+                            onLongPress: () {
+                              _showRepeatDaysSelector(
+                                context,
+                                setModalState,
+                                _newTodoRepeatDays,
+                                (days) {
+                                  setModalState(() {
+                                    _newTodoRepeatDays = days;
+                                    _newTodoRepeating = true;
+                                  });
+                                },
+                              );
+                            },
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1093,6 +1219,30 @@ class _TodoScreenState extends State<TodoScreen> {
                                 child: Icon(
                                   Icons.calendar_today_rounded,
                                   color: theme.colorScheme.primary,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _hideCompleted = !_hideCompleted;
+                                });
+                              },
+                              icon: Container(
+                                decoration: BoxDecoration(
+                                  color: _hideCompleted ? theme.colorScheme.primary.withOpacity(0.1) : theme.colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _hideCompleted ? theme.colorScheme.primary : theme.colorScheme.onBackground.withOpacity(0.08),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.all(8),
+                                child: Icon(
+                                  _hideCompleted ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                  color: _hideCompleted ? theme.colorScheme.primary : theme.colorScheme.onBackground.withOpacity(0.6),
                                   size: 24,
                                 ),
                               ),
@@ -1509,24 +1659,42 @@ class _TodoScreenState extends State<TodoScreen> {
                                                     ),
 
                                                   if (todo.isRepeating)
-                                                    Row(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      children: [
-                                                        Icon(
-                                                          Icons.repeat_rounded,
-                                                          size: 13,
-                                                          color: theme.colorScheme.primary.withOpacity(0.8),
+                                                    GestureDetector(
+                                                      onLongPress: () {
+                                                        _showRepeatDaysSelector(
+                                                          context,
+                                                          setState,
+                                                          todo.repeatDays,
+                                                          (days) {
+                                                            setState(() {
+                                                              todo.repeatDays = days;
+                                                            });
+                                                            _saveTodos();
+                                                          },
+                                                        );
+                                                      },
+                                                      child: MouseRegion(
+                                                        cursor: SystemMouseCursors.click,
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              Icons.repeat_rounded,
+                                                              size: 13,
+                                                              color: theme.colorScheme.primary.withOpacity(0.8),
+                                                            ),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              _getRepeatDaysText(todo.repeatDays),
+                                                              style: TextStyle(
+                                                                fontSize: 11,
+                                                                color: theme.colorScheme.primary.withOpacity(0.8),
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
                                                         ),
-                                                        const SizedBox(width: 4),
-                                                        Text(
-                                                          'Daily',
-                                                          style: TextStyle(
-                                                            fontSize: 11,
-                                                            color: theme.colorScheme.primary.withOpacity(0.8),
-                                                            fontWeight: FontWeight.bold,
-                                                          ),
-                                                        ),
-                                                      ],
+                                                      ),
                                                     ),
                                                 ],
                                               ),
