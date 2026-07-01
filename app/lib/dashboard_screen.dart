@@ -22,6 +22,9 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   bool _isEditingName = false;
   late TextEditingController _nameController;
 
+  String _graphCategory = 'All';
+  String _graphTimeframe = 'Week';
+
   // Premium gradient presets for avatar backgrounds
   final List<List<Color>> _gradientPresets = [
     [const Color(0xFFF97316), const Color(0xFFEC4899)], // Orange -> Pink
@@ -90,30 +93,34 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     }
   }
 
-  void _showAvatarEditSheet() {
-    String tempInitials = _avatarInitials;
-    int tempGradientIndex = _selectedGradientIndex;
-    final initialsController = TextEditingController(text: tempInitials);
+  String _getInitials(String name) {
+    if (name.trim().isEmpty) return '?';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) {
+      final p = parts[0];
+      return p.substring(0, p.length > 1 ? 2 : 1).toUpperCase();
+    }
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
 
+  void _showAvatarEditSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
-
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.background,
+                color: Colors.black,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(28),
                   topRight: Radius.circular(28),
                 ),
                 border: Border.all(
-                  color: theme.colorScheme.onBackground.withOpacity(0.08),
+                  color: const Color(0xFFF97316),
                   width: 1.5,
                 ),
               ),
@@ -156,7 +163,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         gradient: _profileImagePath != null
                             ? null
                             : LinearGradient(
-                                colors: _gradientPresets[tempGradientIndex],
+                                colors: _gradientPresets[0],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
@@ -171,7 +178,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           BoxShadow(
                             color: _profileImagePath != null
                                 ? Colors.black.withOpacity(0.1)
-                                : _gradientPresets[tempGradientIndex][0].withOpacity(0.3),
+                                : _gradientPresets[0][0].withOpacity(0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           )
@@ -181,7 +188,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           ? null
                           : Center(
                               child: Text(
-                                tempInitials.toUpperCase(),
+                                _getInitials(_userName),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -232,118 +239,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Initials Input
-                  Text(
-                    'Initials',
-                    style: TextStyle(
-                      color: theme.colorScheme.onBackground.withOpacity(0.6),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: initialsController,
-                    maxLength: 2,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: InputDecoration(
-                      hintText: 'Enter initials (e.g. ME)',
-                      counterText: '',
-                      filled: true,
-                      fillColor: theme.colorScheme.surfaceVariant,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    onChanged: (val) {
-                      setModalState(() {
-                        tempInitials = val.isEmpty ? '?' : val;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Gradient Chooser
-                  Text(
-                    'Theme Gradient',
-                    style: TextStyle(
-                      color: theme.colorScheme.onBackground.withOpacity(0.6),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 50,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _gradientPresets.length,
-                      itemBuilder: (context, index) {
-                        final isSelected = tempGradientIndex == index;
-                        return GestureDetector(
-                          onTap: () {
-                            setModalState(() {
-                              tempGradientIndex = index;
-                            });
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 12),
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: _gradientPresets[index],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? (isDark ? Colors.white : Colors.black)
-                                    : Colors.transparent,
-                                width: 2.5,
-                              ),
-                            ),
-                            child: isSelected
-                                ? const Icon(Icons.check, color: Colors.white, size: 20)
-                                : null,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Save Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _avatarInitials = tempInitials.trim().isEmpty ? 'ME' : tempInitials;
-                          _selectedGradientIndex = tempGradientIndex;
-                        });
-                        _saveProfileData();
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Save Customization',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             );
@@ -433,16 +328,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Container(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isDark
-                          ? [const Color(0xFF1E1B4B), const Color(0xFF311042)]
-                          : [const Color(0xFFEFF6FF), const Color(0xFFFAE8FF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: Colors.black,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: theme.colorScheme.primary.withOpacity(0.15),
+                      color: const Color(0xFFF97316),
                       width: 1.5,
                     ),
                     boxShadow: [
@@ -470,7 +359,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                   gradient: _profileImagePath != null
                                       ? null
                                       : LinearGradient(
-                                          colors: _gradientPresets[_selectedGradientIndex],
+                                          colors: _gradientPresets[0],
                                           begin: Alignment.topLeft,
                                           end: Alignment.bottomRight,
                                         ),
@@ -485,7 +374,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                     BoxShadow(
                                       color: _profileImagePath != null
                                           ? Colors.black.withOpacity(0.1)
-                                          : _gradientPresets[_selectedGradientIndex][0].withOpacity(0.3),
+                                          : _gradientPresets[0][0].withOpacity(0.3),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     )
@@ -495,7 +384,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                     ? null
                                     : Center(
                                         child: Text(
-                                          _avatarInitials.toUpperCase(),
+                                          _getInitials(_userName),
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
@@ -637,192 +526,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               ),
             ),
 
-            // Statistics Grid
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              sliver: SliverGrid.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 1.4,
-                children: [
-                  _buildStatCard(
-                    context,
-                    title: 'Total Tasks',
-                    value: '$totalCount',
-                    icon: Icons.assignment_rounded,
-                    color: Colors.blue,
-                  ),
-                  _buildStatCard(
-                    context,
-                    title: 'Completed',
-                    value: '$completedCount',
-                    icon: Icons.check_circle_rounded,
-                    color: theme.colorScheme.tertiary,
-                  ),
-                  _buildStatCard(
-                    context,
-                    title: 'Completion',
-                    value: '${(completionRate * 100).toStringAsFixed(0)}%',
-                    icon: Icons.percent_rounded,
-                    color: Colors.purple,
-                  ),
-                  _buildStatCard(
-                    context,
-                    title: 'Pending',
-                    value: '$pendingCount',
-                    icon: Icons.pending_actions_rounded,
-                    color: const Color(0xFFF97316),
-                  ),
-                ],
-              ),
-            ),
 
-            // Category Breakdown
+
+
+            // Activity Chart
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Text(
-                  'Category breakdown',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
+              child: _buildActivityChart(context),
             ),
 
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate(
-                  categories.map((category) {
-                    final catTodos = categoryGroups[category] ?? [];
-                    final int catTotal = catTodos.length;
-                    final int catCompleted = catTodos.where((todo) => todo.isCompleted).length;
-                    final double catProgress = catTotal == 0 ? 0.0 : catCompleted / catTotal;
-
-                    Color catColor = const Color(0xFFF97316);
-                    if (category == 'Work') catColor = Colors.blue;
-                    if (category == 'Design') catColor = Colors.purple;
-                    if (category == 'Fitness') catColor = Colors.green;
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      color: theme.colorScheme.surface,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.onBackground.withOpacity(0.04)),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 12,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        color: catColor,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      category,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Text(
-                                  '$catCompleted / $catTotal completed',
-                                  style: TextStyle(
-                                    color: theme.colorScheme.onBackground.withOpacity(0.6),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: catProgress,
-                                minHeight: 6,
-                                backgroundColor: theme.colorScheme.onBackground.withOpacity(0.1),
-                                valueColor: AlwaysStoppedAnimation<Color>(catColor),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-
-            // High Priority Tasks Highlight
-            if (highPriorityPending > 0) ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Urgent Attention Required',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red.shade400,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate(
-                    widget.todos
-                        .where((todo) => todo.priority == 'High' && !todo.isCompleted)
-                        .map((todo) => Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              color: Colors.red.withOpacity(isDark ? 0.08 : 0.04),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(color: Colors.red.withOpacity(0.2)),
-                              ),
-                              child: ListTile(
-                                dense: true,
-                                leading: const Icon(Icons.priority_high, color: Colors.red),
-                                title: Text(
-                                  todo.title,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                subtitle: Text(
-                                  'Category: ${todo.category}',
-                                  style: TextStyle(color: theme.colorScheme.onBackground.withOpacity(0.5)),
-                                ),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                ),
-              ),
-            ],
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
         ),
@@ -830,46 +541,251 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(BuildContext context,
-      {required String title, required String value, required IconData icon, required Color color}) {
+  Widget _buildActivityChart(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: theme.colorScheme.onBackground.withOpacity(0.04),
+    final isDark = theme.brightness == Brightness.dark;
+
+    final chartTodos = widget.todos.where((todo) {
+      if (_graphCategory == 'All') return true;
+      return todo.category == _graphCategory;
+    }).toList();
+
+    final List<MapEntry<String, int>> dataPoints = [];
+    final now = DateTime.now();
+
+    if (_graphTimeframe == 'Week') {
+      final List<String> dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      for (int i = 6; i >= 0; i--) {
+        final date = now.subtract(Duration(days: i));
+        final dateKey = "${date.year}-${date.month}-${date.day}";
+        final label = dayNames[date.weekday - 1];
+        
+        final count = chartTodos.where((todo) => todo.completedDates.contains(dateKey)).length;
+        dataPoints.add(MapEntry(label, count));
+      }
+    } else {
+      for (int w = 3; w >= 0; w--) {
+        int weekCount = 0;
+        for (int d = 0; d < 7; d++) {
+          final daysAgo = w * 7 + d;
+          final date = now.subtract(Duration(days: daysAgo));
+          final dateKey = "${date.year}-${date.month}-${date.day}";
+          weekCount += chartTodos.where((todo) => todo.completedDates.contains(dateKey)).length;
+        }
+        dataPoints.add(MapEntry('Wk ${4 - w}', weekCount));
+      }
+    }
+
+    final int maxVal = dataPoints.map((e) => e.value).fold(0, (max, v) => v > max ? v : max);
+    final double scaleMax = maxVal == 0 ? 1.0 : maxVal.toDouble();
+
+    Color barColor = theme.colorScheme.primary;
+    if (_graphCategory == 'Work') barColor = Colors.blue;
+    if (_graphCategory == 'Design') barColor = Colors.purple;
+    if (_graphCategory == 'Fitness') barColor = Colors.green;
+    if (_graphCategory == 'Personal') barColor = const Color(0xFFF97316);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: theme.colorScheme.onBackground.withOpacity(0.04),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.shadow.withOpacity(0.02),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            )
+          ],
         ),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: theme.colorScheme.onBackground.withOpacity(0.6),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Completion History',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
-              ),
-              Icon(icon, color: color, size: 20),
-            ],
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: theme.colorScheme.onBackground,
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              letterSpacing: -1,
+                Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onBackground.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    children: ['Week', 'Month'].map((tf) {
+                      final isSelected = _graphTimeframe == tf;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _graphTimeframe = tf;
+                          });
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isSelected ? theme.colorScheme.surface : Colors.transparent,
+                            borderRadius: BorderRadius.circular(100),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.04),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          child: Text(
+                            tf,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected
+                                  ? theme.colorScheme.onBackground
+                                  : theme.colorScheme.onBackground.withOpacity(0.6),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: ['All', 'Work', 'Design', 'Fitness', 'Personal'].map((cat) {
+                  final isSelected = _graphCategory == cat;
+                  Color catColor = theme.colorScheme.primary;
+                  if (cat == 'Work') catColor = Colors.blue;
+                  if (cat == 'Design') catColor = Colors.purple;
+                  if (cat == 'Fitness') catColor = Colors.green;
+                  if (cat == 'Personal') catColor = const Color(0xFFF97316);
+
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _graphCategory = cat;
+                      });
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? catColor.withOpacity(0.12) : theme.colorScheme.onBackground.withOpacity(0.03),
+                        borderRadius: BorderRadius.circular(100),
+                        border: Border.all(
+                          color: isSelected ? catColor : Colors.transparent,
+                          width: 1.5,
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      child: Row(
+                        children: [
+                          if (cat != 'All') ...[
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: catColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            cat,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              color: isSelected ? catColor : theme.colorScheme.onBackground.withOpacity(0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            SizedBox(
+              height: 160,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: dataPoints.map((dp) {
+                  final double barHeight = (dp.value.toDouble() / scaleMax) * 110.0;
+                  return Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (dp.value > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              '${dp.value}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: barColor,
+                              ),
+                            ),
+                          )
+                        else
+                          const SizedBox(height: 16),
+                        
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          width: _graphTimeframe == 'Week' ? 24 : 36,
+                          height: barHeight == 0 ? 4 : barHeight,
+                          decoration: BoxDecoration(
+                            gradient: barHeight == 0
+                                ? null
+                                : LinearGradient(
+                                    colors: [barColor, barColor.withOpacity(0.6)],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                            color: barHeight == 0 ? theme.colorScheme.onBackground.withOpacity(0.08) : null,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        
+                        Text(
+                          dp.key,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: theme.colorScheme.onBackground.withOpacity(0.5),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

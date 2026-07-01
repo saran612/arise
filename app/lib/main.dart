@@ -139,10 +139,12 @@ class Todo {
   String category;
   String priority; // 'High', 'Medium', 'Low'
   final DateTime createdAt;
+  final DateTime actualCreatedAt;
   TimeOfDay? dueTime;
   bool isRepeating;
   List<int> repeatDays; // Days of week: 1 = Mon, 7 = Sun
   List<String> completedDates;
+  Map<String, String> completionTimes; // dateKey -> ISO string of completion timestamp
   bool isCounter;
   int targetCount;
   Map<String, int> dateCounts;
@@ -154,15 +156,19 @@ class Todo {
     required this.category,
     required this.priority,
     required this.createdAt,
+    DateTime? actualCreatedAt,
     this.dueTime,
     this.isRepeating = false,
     List<int>? repeatDays,
     List<String>? completedDates,
+    Map<String, String>? completionTimes,
     this.isCounter = false,
     this.targetCount = 0,
     Map<String, int>? dateCounts,
-  }) : repeatDays = repeatDays ?? [1, 2, 3, 4, 5, 6, 7],
+  }) : actualCreatedAt = actualCreatedAt ?? DateTime.now(),
+       repeatDays = repeatDays ?? [1, 2, 3, 4, 5, 6, 7],
        completedDates = completedDates ?? [],
+       completionTimes = completionTimes ?? {},
        dateCounts = dateCounts ?? {};
 
   Map<String, dynamic> toJson() {
@@ -173,10 +179,12 @@ class Todo {
       'category': category,
       'priority': priority,
       'createdAt': createdAt.toIso8601String(),
+      'actualCreatedAt': actualCreatedAt.toIso8601String(),
       'dueTime': dueTime != null ? {'hour': dueTime!.hour, 'minute': dueTime!.minute} : null,
       'isRepeating': isRepeating,
       'repeatDays': repeatDays,
       'completedDates': completedDates,
+      'completionTimes': completionTimes,
       'isCounter': isCounter,
       'targetCount': targetCount,
       'dateCounts': dateCounts,
@@ -191,6 +199,12 @@ class Todo {
         parsedDateCounts[key] = value as int;
       });
     }
+    final Map<String, String> parsedCompletionTimes = {};
+    if (json['completionTimes'] != null) {
+      (json['completionTimes'] as Map<String, dynamic>).forEach((key, value) {
+        parsedCompletionTimes[key] = value as String;
+      });
+    }
     return Todo(
       id: json['id'],
       title: json['title'],
@@ -198,12 +212,16 @@ class Todo {
       category: json['category'],
       priority: json['priority'],
       createdAt: DateTime.parse(json['createdAt']),
+      actualCreatedAt: json['actualCreatedAt'] != null
+          ? DateTime.parse(json['actualCreatedAt'])
+          : DateTime.parse(json['createdAt']),
       dueTime: dueTimeJson != null
           ? TimeOfDay(hour: dueTimeJson['hour'], minute: dueTimeJson['minute'])
           : null,
       isRepeating: json['isRepeating'] ?? false,
       repeatDays: List<int>.from(json['repeatDays'] ?? [1, 2, 3, 4, 5, 6, 7]),
       completedDates: List<String>.from(json['completedDates'] ?? []),
+      completionTimes: parsedCompletionTimes,
       isCounter: json['isCounter'] ?? false,
       targetCount: json['targetCount'] ?? 0,
       dateCounts: parsedDateCounts,
@@ -319,6 +337,20 @@ class _TodoScreenState extends State<TodoScreen> {
   int get _completedCount => _filteredTodos.where((t) => _isTodoCompletedOnDate(t, _selectedDate)).length;
   double get _completionRate => _filteredTodos.isEmpty ? 0.0 : _completedCount / _filteredTodos.length;
 
+  void _updateTaskCompletionStatus(Todo todo, String dateKey, bool isCompleted) {
+    if (isCompleted) {
+      if (!todo.completedDates.contains(dateKey)) {
+        todo.completedDates.add(dateKey);
+      }
+      if (!todo.completionTimes.containsKey(dateKey)) {
+        todo.completionTimes[dateKey] = DateTime.now().toIso8601String();
+      }
+    } else {
+      todo.completedDates.remove(dateKey);
+      todo.completionTimes.remove(dateKey);
+    }
+  }
+
   void _toggleTodo(String id) {
     setState(() {
       final todoIndex = _todos.indexWhere((t) => t.id == id);
@@ -329,17 +361,20 @@ class _TodoScreenState extends State<TodoScreen> {
           final current = todo.dateCounts[dateKey] ?? 0;
           if (current >= todo.targetCount) {
             todo.dateCounts[dateKey] = 0;
+            _updateTaskCompletionStatus(todo, dateKey, false);
           } else {
             todo.dateCounts[dateKey] = todo.targetCount;
+            _updateTaskCompletionStatus(todo, dateKey, true);
           }
         } else if (todo.isRepeating) {
           if (todo.completedDates.contains(dateKey)) {
-            todo.completedDates.remove(dateKey);
+            _updateTaskCompletionStatus(todo, dateKey, false);
           } else {
-            todo.completedDates.add(dateKey);
+            _updateTaskCompletionStatus(todo, dateKey, true);
           }
         } else {
           todo.isCompleted = !todo.isCompleted;
+          _updateTaskCompletionStatus(todo, dateKey, todo.isCompleted);
         }
       }
     });
@@ -1714,7 +1749,9 @@ class _TodoScreenState extends State<TodoScreen> {
                                                     final dateKey = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
                                                     final current = todo.dateCounts[dateKey] ?? 0;
                                                     if (current > 0) {
-                                                      todo.dateCounts[dateKey] = current - 1;
+                                                      final newVal = current - 1;
+                                                      todo.dateCounts[dateKey] = newVal;
+                                                      _updateTaskCompletionStatus(todo, dateKey, newVal >= todo.targetCount);
                                                     }
                                                   });
                                                   _saveTodos();
@@ -1767,6 +1804,7 @@ class _TodoScreenState extends State<TodoScreen> {
                                                               setState(() {
                                                                 final dateKey = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
                                                                 todo.dateCounts[dateKey] = val;
+                                                                _updateTaskCompletionStatus(todo, dateKey, val >= todo.targetCount);
                                                               });
                                                               _saveTodos();
                                                             }
@@ -1797,7 +1835,9 @@ class _TodoScreenState extends State<TodoScreen> {
                                                   setState(() {
                                                     final dateKey = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
                                                     final current = todo.dateCounts[dateKey] ?? 0;
-                                                    todo.dateCounts[dateKey] = current + 1;
+                                                    final newVal = current + 1;
+                                                    todo.dateCounts[dateKey] = newVal;
+                                                    _updateTaskCompletionStatus(todo, dateKey, newVal >= todo.targetCount);
                                                   });
                                                   _saveTodos();
                                                 },
