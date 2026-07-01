@@ -288,6 +288,7 @@ class _TodoScreenState extends State<TodoScreen> {
           todo.createdAt.day == _selectedDate.day;
       final isPastDay = todo.createdAt.isBefore(_selectedDate);
       final isHighPriorityIncompletePast = todo.priority == 'High' &&
+          !todo.isCompleted &&
           !_isTodoCompletedOnDate(todo, _selectedDate) &&
           !todo.isRepeating &&
           isPastDay;

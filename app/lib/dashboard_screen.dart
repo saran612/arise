@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 import 'main.dart'; // To access the Todo model
 
 class UserDashboardScreen extends StatefulWidget {
@@ -15,6 +17,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   String _userName = 'Productivity Champion';
   String _avatarInitials = 'ME';
   int _selectedGradientIndex = 0;
+  String? _profileImagePath;
 
   bool _isEditingName = false;
   late TextEditingController _nameController;
@@ -47,6 +50,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       _userName = prefs.getString('profile_name') ?? 'Productivity Champion';
       _avatarInitials = prefs.getString('profile_initials') ?? 'ME';
       _selectedGradientIndex = prefs.getInt('profile_gradient_index') ?? 0;
+      _profileImagePath = prefs.getString('profile_image_path');
       _nameController.text = _userName;
     });
   }
@@ -56,6 +60,34 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     await prefs.setString('profile_name', _userName);
     await prefs.setString('profile_initials', _avatarInitials);
     await prefs.setInt('profile_gradient_index', _selectedGradientIndex);
+    if (_profileImagePath != null) {
+      await prefs.setString('profile_image_path', _profileImagePath!);
+    } else {
+      await prefs.remove('profile_image_path');
+    }
+  }
+
+  Future<void> _pickImage(StateSetter setModalState) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+      if (pickedFile != null) {
+        setModalState(() {
+          _profileImagePath = pickedFile.path;
+        });
+        setState(() {
+          _profileImagePath = pickedFile.path;
+        });
+        await _saveProfileData();
+      }
+    } catch (e) {
+      debugPrint("Error picking image: $e");
+    }
   }
 
   void _showAvatarEditSheet() {
@@ -121,34 +153,85 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: _gradientPresets[tempGradientIndex],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        gradient: _profileImagePath != null
+                            ? null
+                            : LinearGradient(
+                                colors: _gradientPresets[tempGradientIndex],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                        image: _profileImagePath != null
+                            ? DecorationImage(
+                                image: FileImage(File(_profileImagePath!)),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: _gradientPresets[tempGradientIndex][0].withOpacity(0.3),
+                            color: _profileImagePath != null
+                                ? Colors.black.withOpacity(0.1)
+                                : _gradientPresets[tempGradientIndex][0].withOpacity(0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           )
                         ],
                       ),
-                      child: Center(
-                        child: Text(
-                          tempInitials.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 26,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ),
+                      child: _profileImagePath != null
+                          ? null
+                          : Center(
+                              child: Text(
+                                tempInitials.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 26,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                            ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+
+                  // Photo Selection Buttons
+                  Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => _pickImage(setModalState),
+                          icon: const Icon(Icons.photo_library_rounded, size: 18),
+                          label: Text(_profileImagePath == null ? 'Choose Photo' : 'Change Photo'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          ),
+                        ),
+                        if (_profileImagePath != null) ...[
+                          const SizedBox(width: 12),
+                          TextButton.icon(
+                            onPressed: () {
+                              setModalState(() {
+                                _profileImagePath = null;
+                              });
+                              setState(() {
+                                _profileImagePath = null;
+                              });
+                              _saveProfileData();
+                            },
+                            icon: Icon(Icons.delete_outline_rounded, size: 18, color: theme.colorScheme.error),
+                            label: Text('Remove', style: TextStyle(color: theme.colorScheme.error)),
+                            style: TextButton.styleFrom(
+                              foregroundColor: theme.colorScheme.error,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // Initials Input
                   Text(
@@ -384,31 +467,43 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                 width: 72,
                                 height: 72,
                                 decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: _gradientPresets[_selectedGradientIndex],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
+                                  gradient: _profileImagePath != null
+                                      ? null
+                                      : LinearGradient(
+                                          colors: _gradientPresets[_selectedGradientIndex],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                  image: _profileImagePath != null
+                                      ? DecorationImage(
+                                          image: FileImage(File(_profileImagePath!)),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null,
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: _gradientPresets[_selectedGradientIndex][0].withOpacity(0.3),
+                                      color: _profileImagePath != null
+                                          ? Colors.black.withOpacity(0.1)
+                                          : _gradientPresets[_selectedGradientIndex][0].withOpacity(0.3),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     )
                                   ],
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    _avatarInitials.toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 24,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ),
+                                child: _profileImagePath != null
+                                    ? null
+                                    : Center(
+                                        child: Text(
+                                          _avatarInitials.toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 24,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                      ),
                               ),
                               Positioned(
                                 bottom: 0,
