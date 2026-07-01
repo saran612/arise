@@ -328,7 +328,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black,
+                    color: theme.colorScheme.background,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
                       color: const Color(0xFFF97316),
@@ -403,7 +403,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                     color: theme.colorScheme.primary,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: isDark ? const Color(0xFF1E1B4B) : const Color(0xFFEFF6FF),
+                                      color: theme.colorScheme.background,
                                       width: 2,
                                     ),
                                   ),
@@ -511,7 +511,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                               ),
                             const SizedBox(height: 4),
                             Text(
-                              'Keep rising, one task at a time.',
+                              'I alone am the honored one.',
                               style: TextStyle(
                                 color: theme.colorScheme.onBackground.withOpacity(0.6),
                                 fontSize: 13,
